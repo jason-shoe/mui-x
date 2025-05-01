@@ -1388,6 +1388,13 @@ BarChart.propTypes = {
       }),
     ]).isRequired,
   ),
+  zoomData: PropTypes.arrayOf(
+    PropTypes.shape({
+      axisId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+      end: PropTypes.number.isRequired,
+      start: PropTypes.number.isRequired,
+    }),
+  ),
 } as any;
 
 export { BarChart };

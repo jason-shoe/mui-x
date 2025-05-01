@@ -12,6 +12,8 @@ import {
 import { UseChartPolarAxisSignature } from './featurePlugins/useChartPolarAxis';
 import { useChartVoronoi, UseChartVoronoiSignature } from './featurePlugins/useChartVoronoi';
 import { useChartZAxis, UseChartZAxisSignature } from './featurePlugins/useChartZAxis';
+import { useChartZoom } from './featurePlugins/useChartZoom/useChartZoom';
+import { UseChartZoomSignature } from './featurePlugins/useChartZoom/useChartZoom.types';
 
 export type AllPluginSignatures<TSeries extends ChartSeriesType = ChartSeriesType> = [
   UseChartZAxisSignature,
@@ -20,6 +22,7 @@ export type AllPluginSignatures<TSeries extends ChartSeriesType = ChartSeriesTyp
   UseChartInteractionSignature,
   UseChartHighlightSignature,
   UseChartVoronoiSignature,
+  UseChartZoomSignature,
 ];
 
 export const DEFAULT_PLUGINS = [
@@ -28,4 +31,5 @@ export const DEFAULT_PLUGINS = [
   useChartInteraction,
   useChartHighlight,
   useChartVoronoi,
+  useChartZoom,
 ] as const;

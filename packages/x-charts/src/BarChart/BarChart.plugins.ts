@@ -15,12 +15,17 @@ import {
   UseChartHighlightSignature,
 } from '../internals/plugins/featurePlugins/useChartHighlight';
 import { ConvertSignaturesIntoPlugins } from '../internals/plugins/models/helpers';
+import {
+  useChartZoom,
+  UseChartZoomSignature,
+} from '../internals/plugins/featurePlugins/useChartZoom';
 
 export type BarChartPluginsSignatures = [
   UseChartZAxisSignature,
   UseChartCartesianAxisSignature<'bar'>,
   UseChartInteractionSignature,
   UseChartHighlightSignature,
+  UseChartZoomSignature,
 ];
 
 export const BAR_CHART_PLUGINS: ConvertSignaturesIntoPlugins<BarChartPluginsSignatures> = [
@@ -28,4 +33,5 @@ export const BAR_CHART_PLUGINS: ConvertSignaturesIntoPlugins<BarChartPluginsSign
   useChartCartesianAxis,
   useChartInteraction,
   useChartHighlight,
+  useChartZoom,
 ];
