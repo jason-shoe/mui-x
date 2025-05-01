@@ -5,10 +5,39 @@ import { ChartPlugin } from '../../models';
 import { UseChartZoomSignature } from './useChartZoom.types';
 import { useSelector } from '../../../store/useSelector';
 import { selectorChartZoomOptionsLookup } from '../useChartCartesianAxis';
+import { selectorChartDrawingArea } from '../../corePlugins/useChartDimensions/useChartDimensions.selectors';
+
+interface ClampResult {
+  start: number;
+  end: number;
+}
+
+function clampZoomRange(start: number, end: number): ClampResult {
+  let newStart = start;
+  let newEnd = end;
+
+  if (newEnd > 100) {
+    newStart -= newEnd - 100;
+    newEnd = 100;
+  }
+
+  if (newStart < 0) {
+    newEnd -= newStart;
+    newStart = 0;
+  }
+
+  return { start: newStart, end: newEnd };
+}
 
 export const useChartZoom: ChartPlugin<UseChartZoomSignature> = ({ store, svgRef, params }) => {
   const throttledStoreUpdate = rafThrottle(store.update);
   const optionsLookup = useSelector(store, selectorChartZoomOptionsLookup);
+  const drawingArea = useSelector(store, selectorChartDrawingArea);
+
+  const [isPanning, setIsPanning] = React.useState(false);
+  const [lastPanPosition, setLastPanPosition] = React.useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   React.useEffect(() => {
     store.update((prev) => ({
@@ -37,6 +66,61 @@ export const useChartZoom: ChartPlugin<UseChartZoomSignature> = ({ store, svgRef
     [store],
   );
 
+  const handlePan = React.useCallback(
+    (event: MouseEvent) => {
+      if (!isPanning || lastPanPosition == null) {
+        return;
+      }
+
+      const svgElement = svgRef.current;
+      if (svgElement == null) {
+        return;
+      }
+
+      const { left, top, width, height } = svgElement.getBoundingClientRect();
+      const x = (event.clientX - left) / width;
+      const y = (event.clientY - top) / height;
+
+      // Calculate the difference in position
+      const dx = x - lastPanPosition.x;
+      const dy = y - lastPanPosition.y;
+
+      throttledStoreUpdate((prev) => {
+        if (prev.zoom == null) {
+          return prev;
+        }
+        debouncedUninteract();
+
+        return {
+          ...prev,
+          zoom: {
+            ...prev.zoom,
+            isInteracting: true,
+            zoomData: prev.zoom.zoomData.map((a) => {
+              const axisWidthPct = a.end - a.start;
+              const axis: 'x' | 'y' = optionsLookup[a.axisId]?.axisDirection ?? 'x';
+              const diff = axis === 'x' ? dx : dy;
+
+              // Calculate new positions based on the drag distance
+              const newStartPct = a.start - diff * axisWidthPct;
+              const newEndPct = a.end - diff * axisWidthPct;
+
+              const clamped = clampZoomRange(newStartPct, newEndPct);
+              return {
+                ...a,
+                start: clamped.start,
+                end: clamped.end,
+              };
+            }),
+          },
+        };
+      });
+
+      setLastPanPosition({ x, y });
+    },
+    [debouncedUninteract, isPanning, lastPanPosition, optionsLookup, svgRef, throttledStoreUpdate],
+  );
+
   const handleZoomOut = React.useCallback(
     (event: WheelEvent) => {
       const svgElement = svgRef.current;
@@ -44,10 +128,10 @@ export const useChartZoom: ChartPlugin<UseChartZoomSignature> = ({ store, svgRef
         return;
       }
 
-      const { left, top, width, height } = svgElement.getBoundingClientRect();
+      const { left, top } = svgElement.getBoundingClientRect();
 
-      const x = (event.clientX - left) / width;
-      const y = (event.clientY - top) / height;
+      const x = (event.clientX - left - drawingArea.left) / drawingArea.width;
+      const y = (event.clientY - top - drawingArea.top) / drawingArea.height;
       // doesn't overlap with svg
       if (x < 0 || x > 1 || y < 0 || y > 1) {
         return;
@@ -77,48 +161,77 @@ export const useChartZoom: ChartPlugin<UseChartZoomSignature> = ({ store, svgRef
               }
 
               const axis: 'x' | 'y' = optionsLookup[a.axisId]?.axisDirection ?? 'x';
-              const middle = (axis === 'x' ? x : y) * axisWidthPct + a.start;
+              const pct = axis === 'x' ? x : y;
+              const middle = pct * (a.end - a.start) + a.start;
 
-              let newStartPct = middle - newAxisWidthPct / 2;
-              let newEndPct = middle + newAxisWidthPct / 2;
+              const newStartPct = middle - newAxisWidthPct * pct;
+              const newEndPct = middle + newAxisWidthPct * (1 - pct);
 
-              if (newEndPct > 100) {
-                newStartPct -= newEndPct - 100;
-                newEndPct = 100;
-              }
-
-              if (newStartPct < 0) {
-                newEndPct += newStartPct;
-                newStartPct = 0;
-              }
+              const clamped = clampZoomRange(newStartPct, newEndPct);
 
               return {
                 ...a,
-                start: newStartPct,
-                end: newEndPct,
+                start: clamped.start,
+                end: clamped.end,
               };
             }),
           },
         };
       });
     },
-    [debouncedUninteract, optionsLookup, svgRef, throttledStoreUpdate],
+    [
+      debouncedUninteract,
+      drawingArea.height,
+      drawingArea.left,
+      drawingArea.top,
+      drawingArea.width,
+      optionsLookup,
+      svgRef,
+      throttledStoreUpdate,
+    ],
   );
 
   React.useEffect(() => {
-    const callback = (event: WheelEvent) => {
-      handleZoomOut(event);
-    };
     const svgElement = svgRef.current;
     if (svgElement == null) {
       return undefined;
     }
 
-    svgElement.addEventListener('wheel', callback);
-    return () => {
-      svgElement.removeEventListener('wheel', callback);
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button === 0) {
+        // Left mouse button
+        const { left, top, width, height } = svgElement.getBoundingClientRect();
+        const x = (event.clientX - left) / width;
+        const y = (event.clientY - top) / height;
+
+        if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+          setIsPanning(true);
+          setLastPanPosition({ x, y });
+        }
+      }
     };
-  }, [handleZoomOut, svgRef]);
+
+    const handleMouseUp = () => {
+      setIsPanning(false);
+      setLastPanPosition(null);
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      handlePan(event);
+    };
+
+    svgElement.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    svgElement.addEventListener('wheel', handleZoomOut);
+
+    return () => {
+      svgElement.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      svgElement.removeEventListener('wheel', handleZoomOut);
+    };
+  }, [handlePan, handleZoomOut, svgRef]);
 
   return {
     instance: {},

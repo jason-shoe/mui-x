@@ -1,12 +1,19 @@
 import * as React from 'react';
-import { BarChartPro } from '@mui/x-charts-pro/BarChartPro';
+import { BarChart } from '@mui/x-charts/BarChart';
 
 export default function ZoomBarChart() {
   return (
-    <BarChartPro
+    <BarChart
       height={300}
-      xAxis={[{ data: data.map((v, i) => i), zoom: true }]}
+      xAxis={[{ data: data.map((v, i) => i), id: 'hello' }]}
       series={series}
+      zoomData={[
+        {
+          axisId: 'hello',
+          start: 0,
+          end: 100,
+        },
+      ]}
     />
   );
 }

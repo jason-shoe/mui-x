@@ -113,3 +113,17 @@ Future plans and high-priority features and enhancements can be found in the [ro
 ## Security
 
 For details on supported versions and contact information for reporting security issues, please refer to the [security policy](https://github.com/mui/mui-x/security/policy).
+
+## Packaging a Tarball
+
+For x-charts, you have to build all of the dependencies first
+
+```
+cd packages/x-charts-vendor
+pnpm build
+cd ../x-internals
+pnpm build
+cd ../x-charts
+pnpm build
+pnpm pack
+```
