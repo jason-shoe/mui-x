@@ -29,6 +29,8 @@ function clampZoomRange(start: number, end: number): ClampResult {
   return { start: newStart, end: newEnd };
 }
 
+const noSelectClass = 'mui-charts-no-select';
+
 export const useChartZoom: ChartPlugin<UseChartZoomSignature> = ({ store, svgRef, params }) => {
   const throttledStoreUpdate = rafThrottle(store.update);
   const optionsLookup = useSelector(store, selectorChartZoomOptionsLookup);
@@ -85,6 +87,7 @@ export const useChartZoom: ChartPlugin<UseChartZoomSignature> = ({ store, svgRef
       const dx = x - lastPanPosition.x;
       const dy = y - lastPanPosition.y;
 
+      event.preventDefault();
       throttledStoreUpdate((prev) => {
         if (prev.zoom == null) {
           return prev;
@@ -205,6 +208,7 @@ export const useChartZoom: ChartPlugin<UseChartZoomSignature> = ({ store, svgRef
         const y = (event.clientY - top) / height;
 
         if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+          event.preventDefault();
           setIsPanning(true);
           setLastPanPosition({ x, y });
         }
@@ -216,20 +220,21 @@ export const useChartZoom: ChartPlugin<UseChartZoomSignature> = ({ store, svgRef
       setLastPanPosition(null);
     };
 
-    const handleMouseMove = (event: MouseEvent) => {
-      handlePan(event);
-    };
-
     svgElement.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handlePan);
     svgElement.addEventListener('wheel', handleZoomOut);
+
+    // Add no-select class to prevent text selection
+    svgElement.classList.add(noSelectClass);
 
     return () => {
       svgElement.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', handlePan);
       svgElement.removeEventListener('wheel', handleZoomOut);
+      // Remove no-select class when cleaning up
+      svgElement.classList.remove(noSelectClass);
     };
   }, [handlePan, handleZoomOut, svgRef]);
 

@@ -35,6 +35,8 @@ const ChartsSurfaceStyles = styled('svg', {
   // This prevents default touch actions when using the svg on mobile devices.
   // For example, prevent page scroll & zoom.
   touchAction: 'none',
+  // Prevent text selection during panning
+  userSelect: 'none',
 }));
 
 /**
